@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08080a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GymPlan">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>GymPlan v3</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#08080a;color:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{max-width:580px;margin:auto;min-height:100vh;padding:18px 15px 70px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+h1{margin:0;font-size:30px}.muted{color:#92929b;font-size:13px}.btn{border:0;background:#1a1a20;color:white;border-radius:12px;padding:10px 13px;font-weight:700}.orange{background:#ff5a36}
+.nav{position:sticky;top:0;z-index:3;background:#08080a;padding:7px 0 12px;display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.nav button{border:0;background:#151519;color:#aaa;border-radius:12px;padding:10px 3px;font-size:12px;font-weight:700}.nav .active{background:#ff5a36;color:white}
+.page{display:none}.page.active{display:block}.card{background:#151519;border:1px solid #24242a;border-radius:20px;padding:18px;margin:11px 0}.hero{background:linear-gradient(145deg,#211713,#151519)}
+.label{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:#8f8f98}.title{font-size:27px;font-weight:850;margin:5px 0}.big{font-size:42px;font-weight:850}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}.stat{background:#1d1d23;border-radius:15px;padding:14px}.stat b{font-size:25px}.week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:10px 0}.day{background:#151519;border-radius:12px;padding:8px 2px;text-align:center;cursor:pointer}.day b{font-size:12px}.day small{display:block;color:#888;font-size:8px;margin-top:3px}.day.sel{background:#ff5a36}.day.sel small{color:white}
+.exercise{display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid #29292e}.exercise:last-child{border-bottom:0}.num{width:29px;height:29px;background:#25252b;border-radius:50%;display:grid;place-items:center;font-size:12px;color:#bbb}.ex{flex:1;font-weight:700}.meta{display:block;color:#999;font-size:12px;font-weight:400;margin-top:3px}.check{background:transparent;color:#aaa;border:1px solid #555;border-radius:9px;padding:7px 9px}.check.done{background:#21865a;border-color:#21865a;color:#fff}
+.primary{width:100%;border:0;background:#ff5a36;color:#fff;border-radius:14px;padding:14px;font-size:16px;font-weight:800;margin-top:10px}.danger{background:#2a1816;color:#ff8065}
+.progress{height:8px;background:#27272d;border-radius:99px;overflow:hidden;margin:10px 0}.bar{height:100%;background:#ff5a36;width:0}
+input,select{width:100%;background:#202027;border:1px solid #34343b;color:white;border-radius:11px;padding:11px}.row{display:flex;gap:8px;align-items:center;margin:9px 0}.row input{width:85px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;align-items:flex-end;justify-content:center;z-index:10}.sheet{width:min(580px,100%);background:#151519;border-radius:24px 24px 0 0;padding:22px}.timer{text-align:center}.timer .big{font-size:65px}.center{text-align:center}.smallbtn{margin:3px}
+canvas{width:100%;height:190px;background:#111116;border-radius:14px}
+.badge{display:inline-block;background:#2a211e;color:#ff8a70;border-radius:99px;padding:6px 9px;font-size:11px;font-weight:700}
+
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:18px}
+.cal-head{font-size:10px;color:#777;text-align:center;padding:5px 0}
+.cal-day{min-height:58px;background:#1b1b21;border-radius:10px;padding:6px;cursor:pointer;position:relative}
+.cal-day.empty{background:transparent;cursor:default}
+.cal-day.today{outline:2px solid #ff5a36}
+.cal-day.selected{background:#2a2020}
+.cal-num{font-size:12px;font-weight:800}
+.cal-workout{font-size:8px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:5px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.done-dot{background:#2aa36d}.planned-dot{background:#ff5a36}.rest-dot{background:#777}
+.calendar-legend{display:flex;gap:12px;flex-wrap:wrap;color:#aaa;font-size:11px;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top"><div><h1>GymPlan</h1><div class="muted" id="greeting">Tren smarter. Bli sterkere.</div></div><button class="btn" onclick="openProfile()">👤</button></div>
+<div class="nav">
+<button class="active" onclick="page('home',this)">I dag</button><button onclick="page('calendar',this)">Kalender</button><button onclick="page('stats',this)">Fremgang</button><button onclick="page('history',this)">Historikk</button><button onclick="page('settings',this)">Profil</button>
+</div>
+
+<section id="home" class="page active">
+<div class="week" id="week"></div>
+<div class="card hero"><div class="label">Dagens økt</div><div class="title" id="todayTitle"></div><div class="muted" id="todayNote"></div>
+<div class="progress"><div class="bar" id="todayBar"></div></div><div class="muted" id="progressText"></div></div>
+<div class="card"><div class="label">Øvelser</div><div id="exerciseList"></div><button class="primary" onclick="startWorkout()">▶ Start trening</button></div>
+<div class="grid2"><div class="stat"><div class="muted">Økter</div><b id="workoutCount">0</b></div><div class="stat"><div class="muted">Streak 🔥</div><b id="streak">0</b></div></div>
+</section>
+
+
+<section id="calendar" class="page">
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+    <button class="btn" onclick="changeMonth(-1)">‹</button>
+    <div class="center"><div class="title" id="monthTitle"></div><div class="muted">Historikk + kommende økter</div></div>
+    <button class="btn" onclick="changeMonth(1)">›</button>
+  </div>
+  <div id="calendarGrid" class="calendar-grid"></div>
+  <div class="calendar-legend">
+    <span><i class="dot done-dot"></i>Fullført</span>
+    <span><i class="dot planned-dot"></i>Planlagt</span>
+    <span><i class="dot rest-dot"></i>Hvile</span>
+  </div>
+</div>
+<div class="card">
+  <div class="label">Valgt dag</div>
+  <div class="title" id="selectedDateTitle">—</div>
+  <div class="muted" id="selectedDateWorkout">Velg en dato i kalenderen.</div>
+  <button class="primary" onclick="openSelectedDay()">Åpne økt</button>
+</div>
+<div class="card">
+  <div class="title">Kommende økter</div>
+  <div id="upcomingList"></div>
+</div>
+</section>
+
+<section id="stats" class="page">
+<div class="card"><div class="title">Fremgang</div><div class="muted">Benkpress – siste registrerte økter</div><canvas id="chart" width="520" height="190"></canvas></div>
+<div class="grid2"><div class="stat"><div class="muted">Beste benkpress</div><b id="pr">0 kg</b></div><div class="stat"><div class="muted">Totalt volum</div><b id="volume">0 kg</b></div></div>
+<div class="card"><div class="label">Legg inn resultat</div><div class="row"><input id="weight" type="number" placeholder="Kg"><input id="reps" type="number" placeholder="Reps"><button class="btn orange" onclick="addLift()">Lagre</button></div></div>
+</section>
+
+<section id="history" class="page"><div class="card"><div class="title">Historikk</div><div id="historyList"></div></div></section>
+
+<section id="settings" class="page">
+<div class="card"><div class="title">Profil</div><div class="muted">Tilpass GymPlan</div><div style="margin-top:13px"><input id="name" placeholder="Navnet ditt"></div><div style="margin-top:9px"><select id="goal"><option>Bygge muskler</option><option>Bli sterkere</option><option>Gå ned i fettprosent</option><option>Holde formen</option></select></div><button class="primary" onclick="saveProfile()">Lagre profil</button></div>
+<div class="card"><div class="title">Treningsplan</div><div class="muted">Endre hva du trener hver dag.</div><div id="planRows"></div></div>
+<div class="card"><button class="btn danger" onclick="resetData()">Nullstill alle data</button></div>
+</section>
+</div>
+
+<div class="modal" id="modal"><div class="sheet"><div class="center"><span class="badge">PAUSE</span><div class="timer"><div class="big" id="timer">01:30</div><button class="btn smallbtn" onclick="changeTimer(-15)">−15</button><button class="btn smallbtn" onclick="changeTimer(15)">+15</button></div><button class="primary" onclick="closeModal()">Ferdig</button></div></div></div>
+
+<script>
+const workouts=["Bryst + triceps","Rygg + biceps","Bein","Skuldre","Hvile","Bryst + rygg","Bein + mage"];
+const db={
+"Bryst + triceps":[["Benkpress","4 × 8–10"],["Skrå hantelpress","3 × 10"],["Cable fly","3 × 12"],["Triceps pushdown","3 × 12"]],
+"Rygg + biceps":[["Nedtrekk","4 × 8–10"],["Sittende roing","3 × 10"],["Enarms hantelroing","3 × 10"],["Bicepscurl","3 × 12"]],
+"Bein":[["Knebøy","4 × 8"],["Beinpress","3 × 10"],["Lårcurl","3 × 12"],["Leg extension","3 × 12"]],
+"Skuldre":[["Skulderpress","4 × 8–10"],["Sidehev","3 × 12"],["Face pull","3 × 12"],["Omvendt flyes","3 × 12"]],
+"Hvile":[["Lett gåtur","20–30 min"],["Mobilitet","10 min"]],
+"Bryst + rygg":[["Benkpress","4 × 8"],["Nedtrekk","4 × 10"],["Skrå hantelpress","3 × 10"],["Roing","3 × 10"]],
+"Bein + mage":[["Knebøy","4 × 8"],["Rumensk markløft","3 × 10"],["Leg curl","3 × 12"],["Planke","3 × 45 sek"]]
+};
+let plan=JSON.parse(localStorage.getItem("gp3_plan")||"null")||[...workouts];
+let done=JSON.parse(localStorage.getItem("gp3_done")||"{}");
+let lifts=JSON.parse(localStorage.getItem("gp3_lifts")||"[]");
+let profile=JSON.parse(localStorage.getItem("gp3_profile")||"{}");
+let sel=(new Date().getDay()+6)%7, timerSec=90, interval;
+let calendarDate=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+let selectedCalendarDate=new Date();
+const days=["MAN","TIR","ONS","TOR","FRE","LØR","SØN"];
+function save(){localStorage.setItem("gp3_plan",JSON.stringify(plan));localStorage.setItem("gp3_done",JSON.stringify(done));localStorage.setItem("gp3_lifts",JSON.stringify(lifts));localStorage.setItem("gp3_profile",JSON.stringify(profile))}
+function render(){
+document.getElementById("greeting").textContent=profile.name?`Hei, ${profile.name} 👋`: "Tren smarter. Bli sterkere.";
+document.getElementById("week").innerHTML=days.map((d,i)=>`<div class="day ${i==sel?'sel':''}" onclick="sel=${i};render()"><b>${d}</b><small>${plan[i].split(' + ')[0]}</small></div>`).join("");
+let w=plan[sel], ex=db[w]||[], completed=ex.filter((_,i)=>done[sel+"-"+i]).length;
+document.getElementById("todayTitle").textContent=w;document.getElementById("todayNote").textContent=w==="Hvile"?"Restitusjon og lett aktivitet.":"Fokus på god teknikk og progresjon.";
+document.getElementById("todayBar").style.width=(ex.length?completed/ex.length*100:0)+"%";document.getElementById("progressText").textContent=`${completed}/${ex.length} øvelser fullført`;
+document.getElementById("exerciseList").innerHTML=ex.map((x,i)=>{let k=sel+"-"+i;return `<div class="exercise"><div class="num">${i+1}</div><div class="ex">${x[0]}<span class="meta">${x[1]}</span></div><button class="check ${done[k]?'done':''}" onclick="toggle('${k}')">${done[k]?'✓':'○'}</button></div>`}).join("");
+document.getElementById("workoutCount").textContent=new Set(Object.keys(done).map(k=>k.split("-")[0])).size;document.getElementById("streak").textContent=calcStreak();
+document.getElementById("historyList").innerHTML=days.map((d,i)=>`<div class="exercise"><div class="ex">${d}<span class="meta">${plan[i]}</span></div><span>${Object.keys(done).filter(k=>k.startsWith(i+"-")).length} ✓</span></div>`).join("");
+document.getElementById("planRows").innerHTML=days.map((d,i)=>`<div class="row"><b style="width:42px">${d}</b><select onchange="plan[${i}]=this.value;save();render()">${workouts.map(x=>`<option ${x==plan[i]?"selected":""}>${x}</option>`).join("")}</select></div>`).join("");
+document.getElementById("name").value=profile.name||"";document.getElementById("goal").value=profile.goal||"Bygge muskler";renderStats();renderCalendar();
+}
+function toggle(k){done[k]=!done[k];save();render()}
+function page(id,b){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");if(id==="stats")renderStats()}
+
+function dateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+function planForDate(d){return plan[(d.getDay()+6)%7]}
+function isCompletedDate(d){
+  const i=(d.getDay()+6)%7, ex=db[planForDate(d)]||[];
+  return ex.length>0 && ex.every((_,j)=>done[i+"-"+j]);
+}
+function renderCalendar(){
+  const y=calendarDate.getFullYear(), m=calendarDate.getMonth();
+  document.getElementById("monthTitle").textContent=new Intl.DateTimeFormat("no-NO",{month:"long",year:"numeric"}).format(calendarDate);
+  const first=new Date(y,m,1), daysInMonth=new Date(y,m+1,0).getDate();
+  const start=(first.getDay()+6)%7;
+  let out=days.map(d=>`<div class="cal-head">${d}</div>`).join("");
+  for(let i=0;i<start;i++) out+=`<div class="cal-day empty"></div>`;
+  const todayKey=dateKey(new Date()), selectedKey=dateKey(selectedCalendarDate);
+  for(let day=1;day<=daysInMonth;day++){
+    const d=new Date(y,m,day), key=dateKey(d), w=planForDate(d), rest=w==="Hvile", completed=isCompletedDate(d);
+    out+=`<div class="cal-day ${key===todayKey?"today ":""}${key===selectedKey?"selected":""}" onclick="selectCalendarDate(${y},${m},${day})">
+      <div class="cal-num">${day}</div>
+      <div class="cal-workout">${rest?"Hvile":w}</div>
+      ${completed?'<i class="dot done-dot" title="Fullført"></i>':!rest?'<i class="dot planned-dot" title="Planlagt"></i>':'<i class="dot rest-dot" title="Hvile"></i>'}
+    </div>`;
+  }
+  document.getElementById("calendarGrid").innerHTML=out;
+  const d=selectedCalendarDate;
+  document.getElementById("selectedDateTitle").textContent=new Intl.DateTimeFormat("no-NO",{weekday:"long",day:"numeric",month:"long"}).format(d);
+  const w=planForDate(d), status=w==="Hvile"?"Hviledag":isCompletedDate(d)?"Fullført":"Planlagt";
+  document.getElementById("selectedDateWorkout").textContent=`${w} · ${status}`;
+  const upcoming=[];
+  const base=new Date(); base.setHours(0,0,0,0);
+  for(let i=0;i<21 && upcoming.length<6;i++){
+    const x=new Date(base); x.setDate(base.getDate()+i);
+    const wx=planForDate(x);
+    if(wx!=="Hvile" && !isCompletedDate(x)) upcoming.push({d:x,w:wx});
+  }
+  document.getElementById("upcomingList").innerHTML=upcoming.length?upcoming.map(x=>`<div class="exercise"><div class="num">${x.d.getDate()}</div><div class="ex">${new Intl.DateTimeFormat("no-NO",{weekday:"long",day:"numeric",month:"short"}).format(x.d)}<span class="meta">${x.w}</span></div><span class="badge">Kommende</span></div>`).join(""):'<div class="muted">Ingen kommende økter.</div>';
+}
+function changeMonth(n){calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+n,1);renderCalendar()}
+function selectCalendarDate(y,m,d){selectedCalendarDate=new Date(y,m,d);renderCalendar()}
+function openSelectedDay(){
+  const d=selectedCalendarDate, i=(d.getDay()+6)%7;
+  sel=i; page("home",document.querySelector(".nav button"));
+}
+
+function startWorkout(){timerSec=90;updateTimer();document.getElementById("modal").style.display="flex";clearInterval(interval);interval=setInterval(()=>{timerSec=Math.max(0,timerSec-1);updateTimer();if(!timerSec)clearInterval(interval)},1000)}
+function updateTimer(){document.getElementById("timer").textContent=`${String(Math.floor(timerSec/60)).padStart(2,"0")}:${String(timerSec%60).padStart(2,"0")}`}
+function changeTimer(n){timerSec=Math.max(0,timerSec+n);updateTimer()}
+function closeModal(){clearInterval(interval);document.getElementById("modal").style.display="none"}
+function addLift(){let kg=+document.getElementById("weight").value,reps=+document.getElementById("reps").value;if(!kg||!reps)return;lifts.push({kg,reps,date:new Date().toLocaleDateString("no-NO")});save();document.getElementById("weight").value="";document.getElementById("reps").value="";renderStats()}
+function renderStats(){let best=Math.max(0,...lifts.map(x=>x.kg));document.getElementById("pr").textContent=best+" kg";document.getElementById("volume").textContent=lifts.reduce((s,x)=>s+x.kg*x.reps,0)+" kg";let c=document.getElementById("chart"),ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle="#333";for(let y=25;y<180;y+=38){ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(500,y);ctx.stroke()}if(!lifts.length)return;let vals=lifts.slice(-8),max=Math.max(...vals.map(x=>x.kg),1);ctx.strokeStyle="#ff5a36";ctx.lineWidth=4;ctx.beginPath();vals.forEach((x,i)=>{let px=30+i*450/Math.max(vals.length-1,1),py=165-(x.kg/max)*130;i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.stroke();vals.forEach((x,i)=>{let px=30+i*450/Math.max(vals.length-1,1),py=165-(x.kg/max)*130;ctx.fillStyle="#ff5a36";ctx.beginPath();ctx.arc(px,py,5,0,7);ctx.fill()})}
+function calcStreak(){return Math.min(30,new Set(Object.keys(done).map(k=>k.split("-")[0])).size)}
+function saveProfile(){profile={name:document.getElementById("name").value.trim(),goal:document.getElementById("goal").value};save();render();alert("Profil lagret!")}
+function openProfile(){document.querySelectorAll(".nav button")[4].click()}
+function resetData(){if(confirm("Nullstille all treningsdata?")){localStorage.clear();location.reload()}}
+render();
+</script>
+</body></html>

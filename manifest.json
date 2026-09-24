@@ -1,0 +1,21 @@
+{
+  "name": "GymPlan",
+  "short_name": "GymPlan",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#08080a",
+  "theme_color": "#08080a",
+  "description": "Din personlige treningskalender og treningslogg.",
+  "icons": [
+    {
+      "src": "icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
