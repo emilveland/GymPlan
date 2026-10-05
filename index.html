@@ -1,14 +1,9 @@
 <!doctype html>
 <html lang="no">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#08080a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="GymPlan">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-180.png">
-<title>GymPlan v3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GymPlan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#08080a;color:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .app{max-width:580px;margin:auto;min-height:100vh;padding:18px 15px 70px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
@@ -35,9 +30,24 @@ canvas{width:100%;height:190px;background:#111116;border-radius:14px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
 .done-dot{background:#2aa36d}.planned-dot{background:#ff5a36}.rest-dot{background:#777}
 .calendar-legend{display:flex;gap:12px;flex-wrap:wrap;color:#aaa;font-size:11px;margin-top:12px}
+
+.auth-screen{position:fixed;inset:0;background:#08080a;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}.auth-card{width:min(430px,100%);background:#151519;border:1px solid #29292f;border-radius:24px;padding:24px}.auth-card h2{font-size:30px;margin:0 0 6px}.auth-card p{color:#92929b;margin:0 0 20px}.auth-card input{margin:7px 0}.auth-msg{min-height:20px;color:#ff8065;font-size:13px;margin-top:10px}.auth-switch{background:none;border:0;color:#ff5a36;font-weight:700;margin-top:12px}.account-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 </style>
 </head>
 <body>
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <h2>GymPlan</h2>
+    <p id="authSubtitle">Logg inn for å lagre treningen din.</p>
+    <input id="authEmail" type="email" autocomplete="email" placeholder="E-postadresse">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="Passord">
+    <input id="authUsername" type="text" autocomplete="username" placeholder="Brukernavn" style="display:none">
+    <button id="authButton" class="primary" onclick="submitAuth()">Logg inn</button>
+    <button id="authSwitch" class="auth-switch" onclick="toggleAuthMode()">Har du ikke konto? Opprett konto</button>
+    <button id="forgotButton" class="auth-switch" onclick="resetPassword()">Glemt passord?</button>
+    <div id="authMsg" class="auth-msg"></div>
+  </div>
+</div>
 <div class="app">
 <div class="top"><div><h1>GymPlan</h1><div class="muted" id="greeting">Tren smarter. Bli sterkere.</div></div><button class="btn" onclick="openProfile()">👤</button></div>
 <div class="nav">
@@ -88,6 +98,7 @@ canvas{width:100%;height:190px;background:#111116;border-radius:14px}
 <section id="history" class="page"><div class="card"><div class="title">Historikk</div><div id="historyList"></div></div></section>
 
 <section id="settings" class="page">
+<div class="card"><div class="account-row"><div><div class="label">Konto</div><div id="accountEmail" class="title" style="font-size:18px">—</div><div class="muted">Dataene dine lagres på kontoen.</div></div><button class="btn danger" onclick="signOut()">Logg ut</button></div></div>
 <div class="card"><div class="title">Profil</div><div class="muted">Tilpass GymPlan</div><div style="margin-top:13px"><input id="name" placeholder="Navnet ditt"></div><div style="margin-top:9px"><select id="goal"><option>Bygge muskler</option><option>Bli sterkere</option><option>Gå ned i fettprosent</option><option>Holde formen</option></select></div><button class="primary" onclick="saveProfile()">Lagre profil</button></div>
 <div class="card"><div class="title">Treningsplan</div><div class="muted">Endre hva du trener hver dag.</div><div id="planRows"></div></div>
 <div class="card"><button class="btn danger" onclick="resetData()">Nullstill alle data</button></div>
@@ -107,6 +118,10 @@ const db={
 "Bryst + rygg":[["Benkpress","4 × 8"],["Nedtrekk","4 × 10"],["Skrå hantelpress","3 × 10"],["Roing","3 × 10"]],
 "Bein + mage":[["Knebøy","4 × 8"],["Rumensk markløft","3 × 10"],["Leg curl","3 × 12"],["Planke","3 × 45 sek"]]
 };
+const SUPABASE_URL="https://igoysnsuofdlmneahkaj.supabase.co";
+const SUPABASE_KEY="sb_publishable_mdk2vkCqzbMVLaDmYZRBZg_tEHuqUZe";
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let currentUser=null, cloudLoaded=false;
 let plan=JSON.parse(localStorage.getItem("gp3_plan")||"null")||[...workouts];
 let done=JSON.parse(localStorage.getItem("gp3_done")||"{}");
 let lifts=JSON.parse(localStorage.getItem("gp3_lifts")||"[]");
@@ -115,7 +130,13 @@ let sel=(new Date().getDay()+6)%7, timerSec=90, interval;
 let calendarDate=new Date(new Date().getFullYear(),new Date().getMonth(),1);
 let selectedCalendarDate=new Date();
 const days=["MAN","TIR","ONS","TOR","FRE","LØR","SØN"];
-function save(){localStorage.setItem("gp3_plan",JSON.stringify(plan));localStorage.setItem("gp3_done",JSON.stringify(done));localStorage.setItem("gp3_lifts",JSON.stringify(lifts));localStorage.setItem("gp3_profile",JSON.stringify(profile))}
+async function save(){
+ localStorage.setItem("gp3_plan",JSON.stringify(plan));localStorage.setItem("gp3_done",JSON.stringify(done));localStorage.setItem("gp3_lifts",JSON.stringify(lifts));localStorage.setItem("gp3_profile",JSON.stringify(profile));
+ if(currentUser && cloudLoaded){
+  const {error}=await supabaseClient.from("profiles").update({username:profile.username||null,full_name:profile.name||null,app_state:{plan,done,lifts,profile},updated_at:new Date().toISOString()}).eq("id",currentUser.id);
+  if(error) console.error("Cloud save",error);
+ }
+}
 function render(){
 document.getElementById("greeting").textContent=profile.name?`Hei, ${profile.name} 👋`: "Tren smarter. Bli sterkere.";
 document.getElementById("week").innerHTML=days.map((d,i)=>`<div class="day ${i==sel?'sel':''}" onclick="sel=${i};render()"><b>${d}</b><small>${plan[i].split(' + ')[0]}</small></div>`).join("");
@@ -184,6 +205,33 @@ function calcStreak(){return Math.min(30,new Set(Object.keys(done).map(k=>k.spli
 function saveProfile(){profile={name:document.getElementById("name").value.trim(),goal:document.getElementById("goal").value};save();render();alert("Profil lagret!")}
 function openProfile(){document.querySelectorAll(".nav button")[4].click()}
 function resetData(){if(confirm("Nullstille all treningsdata?")){localStorage.clear();location.reload()}}
-render();
+async function startApp(user){
+ currentUser=user; document.getElementById("authScreen").style.display="none"; document.querySelector(".app").style.display="block"; document.getElementById("accountEmail").textContent=user.email||"";
+ const {data,error}=await supabaseClient.from("profiles").select("username,full_name,app_state").eq("id",user.id).maybeSingle();
+ if(error){console.error(error);}
+ if(data && data.app_state && Object.keys(data.app_state).length){
+  plan=data.app_state.plan||[...workouts]; done=data.app_state.done||{}; lifts=data.app_state.lifts||[]; profile=data.app_state.profile||{};
+ } else {
+  profile=profile||{}; if(data?.username) profile.username=data.username; if(data?.full_name) profile.name=data.full_name;
+  await supabaseClient.from("profiles").update({app_state:{plan,done,lifts,profile},updated_at:new Date().toISOString()}).eq("id",user.id);
+ }
+ cloudLoaded=true; localStorage.setItem("gp3_plan",JSON.stringify(plan));localStorage.setItem("gp3_done",JSON.stringify(done));localStorage.setItem("gp3_lifts",JSON.stringify(lifts));localStorage.setItem("gp3_profile",JSON.stringify(profile)); render();
+}
+let authMode="login";
+function setAuthMessage(msg,ok=false){const e=document.getElementById("authMsg");e.textContent=msg;e.style.color=ok?"#55c78a":"#ff8065";}
+function toggleAuthMode(){authMode=authMode==="login"?"signup":"login";const s=authMode==="signup";document.getElementById("authSubtitle").textContent=s?"Opprett en GymPlan-konto.":"Logg inn for å lagre treningen din.";document.getElementById("authButton").textContent=s?"Opprett konto":"Logg inn";document.getElementById("authSwitch").textContent=s?"Har du allerede konto? Logg inn":"Har du ikke konto? Opprett konto";document.getElementById("authUsername").style.display=s?"block":"none";document.getElementById("forgotButton").style.display=s?"none":"block";setAuthMessage("");}
+async function submitAuth(){
+ const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value,username=document.getElementById("authUsername").value.trim();
+ if(!email||!password){setAuthMessage("Skriv inn e-post og passord.");return;} if(password.length<6){setAuthMessage("Passordet må ha minst 6 tegn.");return;}
+ setAuthMessage("Jobber...",true); let r;
+ if(authMode==="signup") r=await supabaseClient.auth.signUp({email,password,options:{data:{username}}}); else r=await supabaseClient.auth.signInWithPassword({email,password});
+ if(r.error){setAuthMessage(r.error.message);return;}
+ if(authMode==="signup" && !r.data.session){setAuthMessage("Konto opprettet. Sjekk e-posten din og bekreft kontoen.",true);return;}
+ if(r.data.session) await startApp(r.data.session.user);
+}
+async function resetPassword(){const email=document.getElementById("authEmail").value.trim();if(!email){setAuthMessage("Skriv inn e-postadressen først.");return;}const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:location.href});setAuthMessage(error?error.message:"Sjekk e-posten din for lenke til nytt passord.",!error);}
+async function signOut(){await supabaseClient.auth.signOut();location.reload();}
+(async()=>{document.querySelector(".app").style.display="none";const {data}=await supabaseClient.auth.getSession();if(data.session) await startApp(data.session.user);})();
+
 </script>
 </body></html>
