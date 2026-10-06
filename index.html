@@ -89,7 +89,37 @@ function buildAIContext(){const today=appState.foodEntries.filter(x=>x.date===to
 function renderAI(){const box=document.getElementById("chatMessages");if(!box.children.length)aiMessage("ai","Hei! 👋 Jeg er GymPlan AI. Spør meg om treningen, fremgangen eller maten din.");}
 function aiMessage(type,text){const box=document.getElementById("chatMessages");const d=document.createElement("div");d.className="bubble "+type;d.textContent=text;box.appendChild(d);box.scrollTop=box.scrollHeight}
 function askQuick(q){document.getElementById("chatInput").value=q;sendAI()}
-async function sendAI(){const input=document.getElementById("chatInput"),q=input.value.trim();if(!q)return;input.value="";aiMessage("user",q);const thinking=document.createElement("div");thinking.className="bubble ai";thinking.textContent="Tenker…";const box=document.getElementById("chatMessages");box.appendChild(thinking);box.scrollTop=box.scrollHeight;try{const {data:{session}}=await supabaseClient.auth.getSession();if(!session)throw new Error("Du må være logget inn.");const res=await fetch(SUPABASE_URL+"/functions/v1/gymplan-ai",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:JSON.stringify({message:q})});const data=await res.json();if(!res.ok)throw new Error(data.error||data.message||"AI-tjenesten svarte med en feil.");thinking.remove();aiMessage("ai",data.answer||"Jeg fikk ikke noe svar fra AI.");}catch(e){thinking.textContent="Feil: "+e.message;}}
+async function sendAI(){
+  const input=document.getElementById("chatInput");
+  const q=input.value.trim();
+
+  if(!q)return;
+
+  input.value="";
+  aiMessage("user",q);
+
+  const thinking=document.createElement("div");
+  thinking.className="bubble ai";
+  thinking.textContent="Tenker…";
+
+  const box=document.getElementById("chatMessages");
+  box.appendChild(thinking);
+  box.scrollTop=box.scrollHeight;
+
+  try{
+    const {data,error}=await supabaseClient.functions.invoke("gymplan-ai",{
+      body:{message:q}
+    });
+
+    if(error)throw error;
+
+    thinking.remove();
+    aiMessage("ai",data?.answer||"Jeg fikk ikke noe svar fra AI.");
+
+  }catch(e){
+    thinking.textContent="Feil: "+(e.message||"Kunne ikke kontakte GymPlan AI.");
+  }
+}
 async function startApp(user){currentUser=user;document.getElementById("authScreen").style.display="none";document.querySelector(".app").style.display="block";document.getElementById("accountEmail").textContent=user.email||"";const {data,error}=await supabaseClient.from("profiles").select("username,full_name,app_state").eq("id",user.id).maybeSingle();if(error)console.error(error);if(data&&data.app_state&&Object.keys(data.app_state).length){plan=data.app_state.plan||[...workouts];done=data.app_state.done||{};lifts=data.app_state.lifts||[];profile=data.app_state.profile||{};appState={...appState,...data.app_state}}else{profile=profile||{};if(data?.username)profile.username=data.username;if(data?.full_name)profile.name=data.full_name;await supabaseClient.from("profiles").update({app_state:statePayload(),updated_at:new Date().toISOString()}).eq("id",user.id)}cloudLoaded=true;saveLocal();render()}
 let authMode="login";function setAuthMessage(msg,ok=false){const e=document.getElementById("authMsg");e.textContent=msg;e.style.color=ok?"#55c78a":"#ff8065"}function toggleAuthMode(){authMode=authMode==="login"?"signup":"login";const s=authMode==="signup";document.getElementById("authSubtitle").textContent=s?"Opprett en GymPlan-konto.":"Logg inn for å lagre treningen din.";document.getElementById("authButton").textContent=s?"Opprett konto":"Logg inn";document.getElementById("authSwitch").textContent=s?"Har du allerede konto? Logg inn":"Har du ikke konto? Opprett konto";document.getElementById("authUsername").style.display=s?"block":"none";document.getElementById("forgotButton").style.display=s?"none":"block";setAuthMessage("")}
 async function submitAuth(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value,username=document.getElementById("authUsername").value.trim();if(!email||!password){setAuthMessage("Skriv inn e-post og passord.");return}if(password.length<6){setAuthMessage("Passordet må ha minst 6 tegn.");return}setAuthMessage("Jobber...",true);let r;if(authMode==="signup")r=await supabaseClient.auth.signUp({email,password,options:{data:{username}}});else r=await supabaseClient.auth.signInWithPassword({email,password});if(r.error){setAuthMessage(r.error.message);return}if(authMode==="signup"&&!r.data.session){setAuthMessage("Konto opprettet. Sjekk e-posten din og bekreft kontoen.",true);return}if(r.data.session)await startApp(r.data.session.user)}
